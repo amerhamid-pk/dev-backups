@@ -1,0 +1,54 @@
+name: Backup Dev Mongo Database
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Runs every 6 hours
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install MongoDB tools
+        run: |
+          wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | sudo apt-key add -
+          echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.4 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.4.list
+          sudo apt-get update
+          sudo apt-get install -y mongodb-org-tools
+
+      - name: Backup Dev Database
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI_DEV }}
+        run: |
+          TODAY=$(date +%Y%m%d)
+          NOW=$(date +%H%M)
+          DB_BACKUP_PATH=backups
+          DB_DUMP_PATH=backups/dev
+          mkdir -p $DB_DUMP_PATH
+          echo "Running mongodump..."
+          mongodump --uri="$MONGO_URI" --db=dev --out=$DB_DUMP_PATH
+          if [ "$(ls -A $DB_DUMP_PATH)" ]; then
+            tar -czvf $DB_BACKUP_PATH/dev-backup-$TODAY-$NOW.tar.gz -C $DB_DUMP_PATH .
+            rm -rf $DB_DUMP_PATH
+          else
+            echo "Backup directory is empty. Check the mongodump command."
+            exit 1
+          fi
+
+      - name: Retain only 4 Backup Sets
+        run: |
+          find backups -type f -name '*.tar.gz' -mtime +1 -exec rm {} \;
+
+      - name: Commit and Push Backup
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add -f backups
+          git commit -m "Backup Dev on $(date)"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
