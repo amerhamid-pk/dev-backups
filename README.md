@@ -1,2 +1,2 @@
 # dev-backups
-Dev DB backup 
+Demonstration of automatic mongo db backups using workflow and actions. 
