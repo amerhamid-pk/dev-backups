@@ -1,0 +1,14 @@
+# .github/workflows/test-schedule.yml
+name: Test Scheduled Workflow
+
+on:
+  schedule:
+    - cron: '25 2 * * *' # Runs daily at 2:20 AM UTC
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Print Date
+        run: date
